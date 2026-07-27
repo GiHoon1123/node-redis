@@ -1508,7 +1508,8 @@ export default class RedisClient<
    */
   async _executePipeline(
     commands: Array<RedisMultiQueuedCommand>,
-    selectedDB?: number
+    selectedDB?: number,
+    slotNumber?: number
   ) {
     if (!this._self.#socket.isOpen) {
       return Promise.reject(new ClientClosedError());
@@ -1524,6 +1525,7 @@ export default class RedisClient<
             const traced = trace(CHANNELS.TRACE_COMMAND,
               () => this._self.#queue.addCommand(args, {
                 chainId,
+                slotNumber,
                 typeMapping: this._commandOptions?.typeMapping
               }),
               () => ({
@@ -1564,7 +1566,8 @@ export default class RedisClient<
    */
   async _executeMulti(
     commands: Array<RedisMultiQueuedCommand>,
-    selectedDB?: number
+    selectedDB?: number,
+    slotNumber?: number
   ) {
     const dirtyWatch = this._self.#dirtyWatch;
     this._self.#dirtyWatch = undefined;
@@ -1590,20 +1593,21 @@ export default class RedisClient<
         const typeMapping = this._commandOptions?.typeMapping;
         const chainId = Symbol('MULTI Chain');
         const promises: Array<Promise<unknown>> = [
-          this._self.#queue.addCommand(['MULTI'], { chainId }),
+          this._self.#queue.addCommand(['MULTI'], { chainId, slotNumber }),
         ];
 
         for (const { args } of commands) {
           promises.push(
             this._self.#queue.addCommand(args, {
               chainId,
+              slotNumber,
               typeMapping
             })
           );
         }
 
         promises.push(
-          this._self.#queue.addCommand(['EXEC'], { chainId })
+          this._self.#queue.addCommand(['EXEC'], { chainId, slotNumber })
         );
 
         this._self.#scheduleWrite();

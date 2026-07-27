@@ -648,6 +648,16 @@ export default class RedisCommandsQueue {
     const result: CommandToWrite[] = [];
     let current = this.#toWrite.head;
     while (current !== undefined) {
+      // A chain that has already started writing must stay on this client.
+      // Moving its remaining commands would split the chain across clients.
+      if (
+        this.#chainInExecution !== undefined &&
+        current.value.chainId === this.#chainInExecution
+      ) {
+        current = current.next;
+        continue;
+      }
+
       if (
         current.value.slotNumber !== undefined &&
         slots.has(current.value.slotNumber)
@@ -671,6 +681,14 @@ export default class RedisCommandsQueue {
     const result: CommandToWrite[] = [];
     let current = this.#toWrite.head;
     while (current) {
+      if (
+        this.#chainInExecution !== undefined &&
+        current.value.chainId === this.#chainInExecution
+      ) {
+        current = current.next;
+        continue;
+      }
+
       result.push(current.value);
       this.#toWrite.remove(current);
       current = current.next;
